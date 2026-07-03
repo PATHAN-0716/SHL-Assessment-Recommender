@@ -39,6 +39,7 @@ Categories:
 
             metadata = {
                 "entity_id": assessment.get("entity_id"),
+                "name": assessment.get("name"),          # <-- Added
                 "url": assessment.get("link"),
                 "duration": assessment.get("duration"),
                 "remote": assessment.get("remote"),

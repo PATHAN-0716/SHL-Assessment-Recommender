@@ -24,14 +24,13 @@ def chat(
     request: ChatRequest,
 ):
 
-    answer = service.chat(
+    result = service.chat(
         request.session_id,
         request.message,
     )
 
-    return ChatResponse(
-        response=answer,
-    )
+    return ChatResponse(**result)
+
 
 @router.get("/health")
 def health():

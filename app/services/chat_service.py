@@ -3,6 +3,7 @@ Purpose:
 Coordinates the complete SHL recommendation workflow.
 """
 
+import time
 from pathlib import Path
 
 from app.embeddings.embedding_model import EmbeddingModel
@@ -23,23 +24,38 @@ class ChatService:
 
         self.prompt_builder = RecommendationPrompt()
 
-        self.gemini = GeminiService()
+        # Lazy-loaded components
+        self.gemini = None
+        self.vector_store = None
+        self.db = None
 
-        embedding_model = EmbeddingModel()
+    def _load_models(self):
 
-        self.vector_store = VectorStore(
-            embedding_model.embeddings
-        )
+        if self.gemini is None:
+            self.gemini = GeminiService()
 
-        self.db = self.vector_store.load(
-            Path("vector_store")
-        )
+        if self.db is None:
+
+            embedding_model = EmbeddingModel()
+
+            self.vector_store = VectorStore(
+                embedding_model.embeddings
+            )
+
+            self.db = self.vector_store.load(
+                Path("vector_store")
+            )
 
     def chat(
         self,
         session_id: str,
         message: str,
-    ) -> str:
+    ):
+
+        start = time.perf_counter()
+
+        # Load heavy objects only on first chat request
+        self._load_models()
 
         history = self.memory.get_history(session_id)
 
@@ -62,7 +78,16 @@ class ChatService:
                 state.clarification_question,
             )
 
-            return state.clarification_question
+            latency = round(
+                (time.perf_counter() - start) * 1000,
+                2,
+            )
+
+            return {
+                "response": state.clarification_question,
+                "retrieved_assessments": [],
+                "latency_ms": latency,
+            }
 
         query = state.search_query or message
 
@@ -86,4 +111,18 @@ class ChatService:
             response,
         )
 
-        return response
+        latency = round(
+            (time.perf_counter() - start) * 1000,
+            2,
+        )
+
+        retrieved = [
+            doc.metadata.get("name", "")
+            for doc in documents
+        ]
+
+        return {
+            "response": response,
+            "retrieved_assessments": retrieved,
+            "latency_ms": latency,
+        }
